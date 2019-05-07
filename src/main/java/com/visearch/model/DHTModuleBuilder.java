@@ -8,8 +8,6 @@ import org.apache.commons.logging.LogFactory;
 
 import java.util.Optional;
 
-import static com.visearch.service.TorrentDownloadService.tryGetPort;
-
 public class DHTModuleBuilder {
     private static final Log logger = LogFactory.getLog(DHTModuleBuilder.class);
 
@@ -28,6 +26,18 @@ public class DHTModuleBuilder {
                 return true;
             }
         });
+    }
+
+    private static Optional<Integer> tryGetPort(final Integer port) {
+        if (port == null) {
+            return Optional.empty();
+
+        } else if (port < 1024 || port > 65535) {
+            throw new IllegalArgumentException("Invalid port: " + port + "; expected 1024..65535");
+
+        }
+        return Optional.of(port);
+
     }
 
 }

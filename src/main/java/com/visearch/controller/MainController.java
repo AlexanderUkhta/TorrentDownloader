@@ -24,17 +24,12 @@ public class MainController {
     @RequestMapping(value = "/download", method = RequestMethod.POST)
     public ResponseEntity<?> processRequest(@RequestBody @Valid JsonBody jsonBody) {
         String magnetLink = jsonBody.getMagnetLink();
+        torrentDownloadService.addMagnetToMap(magnetLink);
 
-        try {
-            logger.info("Got a request with param 'magnet_link':" + magnetLink);
-            torrentDownloadService.processDownloadingByMagnetLink(magnetLink);
-
-        } catch (IllegalArgumentException e) {
-            logger.error("Got IAException: ", e);
+        if (magnetLink == null)
             return new ResponseEntity<>("Not null 'magnet' parameter required, " +
                     "try again after setting one.", HttpStatus.BAD_REQUEST);
 
-        } //todo: think of session being interrupted
         return new ResponseEntity<>("\nDownloaded torrent from link: \n" + magnetLink,
                 HttpStatus.OK);
 

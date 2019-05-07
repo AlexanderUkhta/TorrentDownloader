@@ -18,8 +18,11 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.nio.file.Path;
 import java.security.Security;
-import java.util.Optional;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
+import static com.visearch.config.ConfigConstantsAndMethods.MAGNET_LINK_INITIALIAZED;
+import static com.visearch.config.ConfigConstantsAndMethods.MAGNET_LINK_PROCESS_SUCCEEDED;
 import static com.visearch.model.DHTModuleBuilder.buildDHTModule;
 
 @Service
@@ -28,6 +31,8 @@ public class TorrentDownloadService {
 
     @Autowired
     private SearchForDownloadedContentService searchForDownloadedContentService;
+
+    private ConcurrentHashMap<String, Integer> magnetLinkMap = new ConcurrentHashMap<>();
     private BtClientBuilder clientBuilder;
 
     TorrentDownloadService() {
@@ -55,9 +60,6 @@ public class TorrentDownloadService {
                 .storage(storage)
                 .selector(selector);
 
-        clientBuilder.afterTorrentFetched(System.out::println); //todo: set normal afterparty Consumers
-        clientBuilder.afterFilesChosen(System.out::println);
-
     }
 
     public void processDownloadingByMagnetLink(String magnetLink) {
@@ -68,14 +70,19 @@ public class TorrentDownloadService {
         else
             throw new IllegalStateException("Torrent file or magnet URI is required");
 
+        //todo: is setting id to each client needed?
         BtClient client = clientBuilder.build();
         logger.info("Starting new bit torrent client...");
+        logger.info("New bit torrent client will download files from magnet_link = " + magnetLink);
+
         client.startAsync(state -> {
                 boolean complete = (state.getPiecesRemaining() == 0);
                 if (complete) {
                     client.stop();
+                    magnetLinkMap.put(magnetLink, MAGNET_LINK_PROCESS_SUCCEEDED);
                     logger.info("Download Completed!");
                 }
+                //todo: is it necessary to throw TimeoutException?
             }, 1000).join();
 
     }
@@ -90,14 +97,22 @@ public class TorrentDownloadService {
         }
     }
 
-    public static Optional<Integer> tryGetPort(final Integer port) {
-        if (port == null) {
-            return Optional.empty();
-
-        } else if (port < 1024 || port > 65535) {
-            throw new IllegalArgumentException("Invalid port: " + port + "; expected 1024..65535");
-
-        }
-        return Optional.of(port);
+    public void addMagnetToMap(String magnetLink) {
+        magnetLinkMap.put(magnetLink, MAGNET_LINK_INITIALIAZED);
     }
+
+    public void changeMagnetLinkStatus(String magnetLink, Integer status) {
+        magnetLinkMap.put(magnetLink, status);
+    }
+
+    public String getNextInitializedLink() {
+        return magnetLinkMap.entrySet().stream()
+                .filter(entry -> (entry.getValue() == (int)MAGNET_LINK_INITIALIAZED))
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+    }
+
 }
+
+
